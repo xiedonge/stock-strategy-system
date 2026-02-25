@@ -1,2 +1,79 @@
-# stock-strategy-system
-选股
+# 股票策略选股系统（A股）
+
+本项目是一个面向个人量化研究的 A 股选股系统样板，包含行情采集、本地持久化、策略管理、选股计算与回测可视化等核心能力。当前实现提供一个可运行的全栈骨架，并通过内置示例数据帮助你快速验证流程。
+
+## 功能概览
+
+- 日线与 30 分钟级别行情存储（SQLite）
+- 策略管理（可扩展策略类型与参数）
+- 选股计算（MA 交叉策略示例）
+- 历史回测与权益曲线展示（ECharts）
+- 前后端分离，适合后续扩展数据源与策略库
+
+## 技术栈
+
+- 前端：Vue 3 + Vite + ECharts + Pinia
+- 后端：Go + Gin + GORM
+- 数据库：SQLite（本地持久化）
+
+## 项目结构
+
+- `backend/` Go 服务端
+- `frontend/` Vue 前端
+- `stock-strategy-system.md` 需求说明
+
+## 快速开始
+
+### 后端
+
+```bash
+cd backend
+# 初始化依赖
+GO111MODULE=on go mod tidy
+
+# 启动服务（默认端口 8080）
+go run ./cmd/server
+```
+
+可选环境变量：
+
+- `PORT`: 服务端口（默认 8080）
+- `DB_PATH`: SQLite 文件路径（默认 `data/stock.db`）
+
+### 前端
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+默认前端通过 `http://localhost:8080/api` 访问后端，如需调整可设置：
+
+- `VITE_API_BASE`: 例如 `http://localhost:8080/api`
+
+### 示例数据
+
+- 在前端点击“导入示例数据”即可生成模拟行情并写入数据库。
+- 也可通过接口调用：`POST /api/demo/seed`。
+
+## 核心接口
+
+- `GET /api/health` 服务健康检查
+- `POST /api/demo/seed` 生成示例行情
+- `GET /api/stocks` 获取股票列表
+- `GET /api/stocks/:code/klines?interval=1d&limit=200` 获取 K 线数据
+- `GET /api/strategies` 策略列表
+- `POST /api/strategies` 创建策略
+- `POST /api/screen` 运行选股
+- `POST /api/backtest` 运行回测
+
+## 策略扩展建议
+
+- 在 `backend/internal/strategy/` 添加新策略文件。
+- 在 `backend/internal/services/analysis_service.go` 中注册策略执行逻辑。
+- 前端可扩展策略参数表单以匹配新增策略。
+
+## 备注
+
+当前示例使用内置随机行情作为数据源，方便本地验证流程。若接入真实行情数据，可在后端新增采集任务，写入 `klines` 表即可复用现有选股与回测流程。
