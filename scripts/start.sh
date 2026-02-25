@@ -15,6 +15,128 @@ require_cmd() {
   fi
 }
 
+run_as_root() {
+  if [[ $(id -u) -eq 0 ]]; then
+    "$@"
+    return
+  fi
+  if command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+    return
+  fi
+  echo "Need root privileges to install dependencies. Please run with sudo." >&2
+  return 1
+}
+
+detect_pkg_manager() {
+  if command -v apt-get >/dev/null 2>&1; then
+    echo "apt"
+    return
+  fi
+  if command -v dnf >/dev/null 2>&1; then
+    echo "dnf"
+    return
+  fi
+  if command -v yum >/dev/null 2>&1; then
+    echo "yum"
+    return
+  fi
+  if command -v pacman >/dev/null 2>&1; then
+    echo "pacman"
+    return
+  fi
+  if command -v apk >/dev/null 2>&1; then
+    echo "apk"
+    return
+  fi
+  if command -v brew >/dev/null 2>&1; then
+    echo "brew"
+    return
+  fi
+  return 1
+}
+
+install_packages() {
+  local pm
+  pm=$(detect_pkg_manager) || return 1
+  case "$pm" in
+    apt)
+      run_as_root apt-get update
+      run_as_root apt-get install -y "$@"
+      ;;
+    dnf)
+      run_as_root dnf install -y "$@"
+      ;;
+    yum)
+      run_as_root yum install -y "$@"
+      ;;
+    pacman)
+      run_as_root pacman -Sy --noconfirm "$@"
+      ;;
+    apk)
+      run_as_root apk add --no-cache "$@"
+      ;;
+    brew)
+      brew install "$@"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+ensure_command() {
+  local cmd="$1"
+  shift
+  if command -v "$cmd" >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "Missing $cmd. Attempting to install..."
+  "$@" || {
+    echo "Auto-install failed for $cmd. Please install it manually." >&2
+    exit 1
+  }
+  require_cmd "$cmd"
+}
+
+install_go() {
+  local pm
+  pm=$(detect_pkg_manager) || return 1
+  case "$pm" in
+    apt)
+      install_packages golang-go
+      ;;
+    dnf|yum)
+      install_packages golang
+      ;;
+    pacman|apk)
+      install_packages go
+      ;;
+    brew)
+      install_packages go
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+install_node() {
+  local pm
+  pm=$(detect_pkg_manager) || return 1
+  case "$pm" in
+    apt|dnf|yum|pacman|apk)
+      install_packages nodejs npm
+      ;;
+    brew)
+      install_packages node
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 is_running() {
   local pid="$1"
   if [[ -z "$pid" ]]; then
@@ -48,8 +170,8 @@ stop_pidfile() {
   rm -f "$pidfile"
 }
 
-require_cmd go
-require_cmd npm
+ensure_command go install_go
+ensure_command npm install_node
 
 # Stop previous runs if any.
 stop_pidfile "$RUN_DIR/backend.pid"
