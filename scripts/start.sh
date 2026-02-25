@@ -56,6 +56,20 @@ detect_pkg_manager() {
   return 1
 }
 
+get_primary_ip() {
+  local ip=""
+  if command -v hostname >/dev/null 2>&1; then
+    ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+  fi
+  if [[ -z "$ip" ]] && command -v ip >/dev/null 2>&1; then
+    ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") {print $(i+1); exit}}')
+  fi
+  if [[ -z "$ip" ]] && command -v ifconfig >/dev/null 2>&1; then
+    ip=$(ifconfig 2>/dev/null | awk '/inet / && $2 != "127.0.0.1" {print $2; exit}')
+  fi
+  echo "$ip"
+}
+
 install_packages() {
   local pm
   pm=$(detect_pkg_manager) || return 1
@@ -214,3 +228,14 @@ echo "Frontend started on :$FRONTEND_PORT (pid $FRONTEND_PID)"
 echo "Logs:"
 echo "  Backend:  $RUN_DIR/backend.log"
 echo "  Frontend: $RUN_DIR/frontend.log"
+
+PRIMARY_IP=$(get_primary_ip)
+echo "Access URLs:"
+echo "  Frontend: http://localhost:$FRONTEND_PORT"
+if [[ -n "$PRIMARY_IP" ]]; then
+  echo "  Frontend (LAN): http://$PRIMARY_IP:$FRONTEND_PORT"
+fi
+echo "  Backend API: http://localhost:$BACKEND_PORT/api"
+if [[ -n "$PRIMARY_IP" ]]; then
+  echo "  Backend API (LAN): http://$PRIMARY_IP:$BACKEND_PORT/api"
+fi
