@@ -24,6 +24,30 @@
 
 ## 快速开始
 
+### 一键启动（推荐）
+
+```bash
+./scripts/start.sh
+```
+
+默认启动：
+
+- 后端 `:8080`
+- 前端 `:5173`
+
+可选环境变量：
+
+- `PORT`：后端端口
+- `FRONTEND_PORT`：前端端口
+
+### 一键卸载
+
+```bash
+./scripts/uninstall.sh
+```
+
+说明：会停止服务并清理 `backend/data/`、`frontend/node_modules/`、`frontend/dist/`、`.run/`。
+
 ### 后端
 
 ```bash

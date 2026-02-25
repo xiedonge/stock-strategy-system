@@ -5,6 +5,9 @@ backend/tmp/
 # SQLite
 backend/data/*.db
 
+# Run logs and pid files
+.run/
+
 # Node
 frontend/node_modules/
 frontend/dist/
