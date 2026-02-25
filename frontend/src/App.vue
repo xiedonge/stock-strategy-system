@@ -89,6 +89,74 @@
           </div>
         </div>
       </div>
+
+      <div class="card">
+        <h2>AkShare 同步</h2>
+        <div class="form-row">
+          <label>股票代码（逗号分隔，留空则按数量取样）</label>
+          <input v-model="syncForm.symbols" placeholder="000001,600519" />
+        </div>
+        <div class="form-row">
+          <label>同步模式</label>
+          <select v-model="syncForm.mode">
+            <option value="all">日线 + 分钟线</option>
+            <option value="daily">仅日线</option>
+            <option value="minute">仅分钟线</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>日线起始 (YYYYMMDD)</label>
+          <input v-model="syncForm.startDate" placeholder="20240101" />
+        </div>
+        <div class="form-row">
+          <label>日线结束 (YYYYMMDD)</label>
+          <input v-model="syncForm.endDate" placeholder="20241231" />
+        </div>
+        <div class="form-row">
+          <label>分钟起始 (YYYY-MM-DD HH:MM:SS)</label>
+          <input v-model="syncForm.minStart" placeholder="2024-12-01 09:30:00" />
+        </div>
+        <div class="form-row">
+          <label>分钟结束 (YYYY-MM-DD HH:MM:SS)</label>
+          <input v-model="syncForm.minEnd" placeholder="2025-02-01 15:00:00" />
+        </div>
+        <div class="form-row">
+          <label>分钟周期</label>
+          <select v-model="syncForm.period">
+            <option value="1">1 分钟</option>
+            <option value="5">5 分钟</option>
+            <option value="15">15 分钟</option>
+            <option value="30">30 分钟</option>
+            <option value="60">60 分钟</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>默认数量（未指定代码时）</label>
+          <input v-model.number="syncForm.limit" type="number" min="1" step="1" />
+        </div>
+        <button class="primary" @click="runAkshareSync" :disabled="syncLoading">
+          {{ syncLoading ? '同步中...' : '启动同步' }}
+        </button>
+        <p class="footer-note">留空将使用脚本默认范围，首次同步会下载依赖。</p>
+        <div v-if="syncError" class="footer-note" style="color: #b42318;">{{ syncError }}</div>
+        <div v-if="syncResult" class="result-list">
+          <div class="result-item">
+            <div>
+              <strong>同步结果</strong>
+              <span>股票 {{ syncResult.stocks }} · 日线 {{ syncResult.daily_rows }} · 分钟线 {{ syncResult.minute_rows }}</span>
+            </div>
+            <div class="metrics">
+              <div>
+                <div>错误数</div>
+                <strong>{{ syncErrors.length }}</strong>
+              </div>
+            </div>
+          </div>
+          <div v-for="(err, idx) in syncErrors" :key="idx" class="footer-note">
+            {{ err.symbol }} · {{ err.mode }} · {{ err.error }}
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="chart-grid">
@@ -136,11 +204,25 @@ const selectedStrategyId = ref('')
 const selectedStockCode = ref('')
 const initialCapital = ref(100000)
 const screeningResults = ref([])
+const syncLoading = ref(false)
+const syncResult = ref(null)
+const syncError = ref('')
 
 const form = reactive({
   name: '',
   description: '',
   params: '{"short_window":5,"long_window":20}'
+})
+
+const syncForm = reactive({
+  symbols: '',
+  mode: 'all',
+  startDate: '',
+  endDate: '',
+  minStart: '',
+  minEnd: '',
+  period: '30',
+  limit: 50
 })
 
 const selectedStrategyLabel = computed(() => {
@@ -151,6 +233,11 @@ const selectedStrategyLabel = computed(() => {
 const selectedStockLabel = computed(() => {
   const stock = stockStore.stocks.find((item) => item.code === selectedStockCode.value)
   return stock ? `${stock.name} (${stock.code})` : '股票未选择'
+})
+
+const syncErrors = computed(() => {
+  if (!syncResult.value || !Array.isArray(syncResult.value.errors)) return []
+  return syncResult.value.errors
 })
 
 const refreshAll = async () => {
@@ -194,6 +281,40 @@ const runBacktest = async () => {
     stock_code: selectedStockCode.value,
     initial_capital: initialCapital.value
   })
+}
+
+const runAkshareSync = async () => {
+  syncError.value = ''
+  syncResult.value = null
+  syncLoading.value = true
+
+  try {
+    const symbols = syncForm.symbols
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+    const payload = {
+      mode: syncForm.mode
+    }
+    if (symbols.length) {
+      payload.symbols = symbols
+    } else if (syncForm.limit) {
+      payload.limit = syncForm.limit
+    }
+    if (syncForm.startDate) payload.start_date = syncForm.startDate
+    if (syncForm.endDate) payload.end_date = syncForm.endDate
+    if (syncForm.minStart) payload.min_start = syncForm.minStart
+    if (syncForm.minEnd) payload.min_end = syncForm.minEnd
+    if (syncForm.period) payload.period = syncForm.period
+
+    const { data } = await api.post('/sync/akshare', payload)
+    syncResult.value = data.summary
+    await refreshAll()
+  } catch (err) {
+    syncError.value = err?.response?.data?.error || err?.message || '同步失败'
+  } finally {
+    syncLoading.value = false
+  }
 }
 
 onMounted(refreshAll)
