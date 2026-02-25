@@ -84,6 +84,31 @@ npm run dev
 - 在前端点击“导入示例数据”即可生成模拟行情并写入数据库。
 - 也可通过接口调用：`POST /api/demo/seed`。
 
+### AkShare 数据同步
+
+使用 AkShare 获取 A 股行情（支持日线与 30 分钟级别）。第一次运行会自动创建 Python 虚拟环境并安装依赖。
+
+```bash
+./scripts/sync_akshare.sh --symbols 000001,600519 --mode all --start-date 20240101 --end-date 20241231 --min-start "2024-12-01 09:30:00" --min-end "2025-02-01 15:00:00" --period 30
+```
+
+参数说明：
+
+- `--symbols`: 股票代码列表（逗号分隔）；不提供则按 `--limit` 自动取前 N 只
+- `--mode`: `daily` / `minute` / `all`
+- `--start-date` / `--end-date`: 日线区间（YYYYMMDD）
+- `--min-start` / `--min-end`: 分钟线区间（YYYY-MM-DD HH:MM:SS）
+- `--period`: 分钟线周期（默认 30）
+- `--limit`: 未指定 symbols 时的默认数量（默认 50）
+
+也可通过接口触发同步：
+
+```bash
+curl -X POST http://localhost:8080/api/sync/akshare \
+  -H 'Content-Type: application/json' \
+  -d '{"symbols":["000001","600519"],"mode":"all","start_date":"20240101","end_date":"20241231","min_start":"2024-12-01 09:30:00","min_end":"2025-02-01 15:00:00","period":"30"}'
+```
+
 ## 核心接口
 
 - `GET /api/health` 服务健康检查
@@ -94,6 +119,7 @@ npm run dev
 - `POST /api/strategies` 创建策略
 - `POST /api/screen` 运行选股
 - `POST /api/backtest` 运行回测
+- `POST /api/sync/akshare` AkShare 行情同步
 
 ## 策略扩展建议
 

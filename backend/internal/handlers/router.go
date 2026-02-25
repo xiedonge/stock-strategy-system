@@ -10,7 +10,7 @@ import (
 )
 
 // NewRouter wires the HTTP routes to services.
-func NewRouter(stockService *services.StockService, strategyService *services.StrategyService, analysisService *services.AnalysisService) *gin.Engine {
+func NewRouter(stockService *services.StockService, strategyService *services.StrategyService, analysisService *services.AnalysisService, syncService *services.SyncService) *gin.Engine {
 	router := gin.Default()
 	router.Use(cors.Default())
 
@@ -139,6 +139,35 @@ func NewRouter(stockService *services.StockService, strategyService *services.St
 				return
 			}
 			c.JSON(http.StatusOK, result)
+		})
+
+		api.POST("/sync/akshare", func(c *gin.Context) {
+			if syncService == nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{"error": "sync service not configured"})
+				return
+			}
+
+			var req AkshareSyncRequest
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			summary, err := syncService.RunAkShareSync(services.SyncOptions{
+				Symbols:  req.Symbols,
+				Mode:     req.Mode,
+				StartDate: req.StartDate,
+				EndDate:   req.EndDate,
+				MinStart:  req.MinStart,
+				MinEnd:    req.MinEnd,
+				Period:    req.Period,
+				Limit:     req.Limit,
+			})
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"message": "sync completed", "summary": summary})
 		})
 	}
 

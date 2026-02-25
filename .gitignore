@@ -8,6 +8,9 @@ backend/data/*.db
 # Run logs and pid files
 .run/
 
+# Python
+__pycache__/
+
 # Node
 frontend/node_modules/
 frontend/dist/

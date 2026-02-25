@@ -40,3 +40,15 @@ type BacktestRequest struct {
 	StockCode      string  `json:"stock_code"`
 	InitialCapital float64 `json:"initial_capital"`
 }
+
+// AkshareSyncRequest defines the payload for AkShare data sync.
+type AkshareSyncRequest struct {
+	Symbols   []string `json:"symbols"`
+	Mode      string   `json:"mode"`
+	StartDate string   `json:"start_date"`
+	EndDate   string   `json:"end_date"`
+	MinStart  string   `json:"min_start"`
+	MinEnd    string   `json:"min_end"`
+	Period    string   `json:"period"`
+	Limit     int      `json:"limit"`
+}
