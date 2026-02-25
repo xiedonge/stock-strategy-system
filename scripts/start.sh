@@ -5,6 +5,8 @@ ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 RUN_DIR="$ROOT_DIR/.run"
 BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIR="$ROOT_DIR/frontend"
+BACKEND_PORT=${PORT:-8080}
+FRONTEND_PORT=${FRONTEND_PORT:-5173}
 
 mkdir -p "$RUN_DIR"
 
@@ -68,6 +70,62 @@ get_primary_ip() {
     ip=$(ifconfig 2>/dev/null | awk '/inet / && $2 != "127.0.0.1" {print $2; exit}')
   fi
   echo "$ip"
+}
+
+get_listen_pids() {
+  local port="$1"
+  local pids=""
+  if command -v lsof >/dev/null 2>&1; then
+    pids=$(lsof -ti tcp:"$port" -sTCP:LISTEN 2>/dev/null || true)
+  elif command -v ss >/dev/null 2>&1; then
+    pids=$(ss -ltnp "sport = :$port" 2>/dev/null | awk 'NR>1 {for(i=1;i<=NF;i++){if($i ~ /pid=/){gsub(/.*pid=/,"",$i); gsub(/,.*/,"",$i); print $i}}}' | sort -u)
+  elif command -v fuser >/dev/null 2>&1; then
+    pids=$(fuser -n tcp "$port" 2>/dev/null | tr ' ' '\n' | sort -u)
+  fi
+  echo "$pids"
+}
+
+is_project_pid() {
+  local pid="$1"
+  local cmdline
+  cmdline=$(ps -p "$pid" -o command= 2>/dev/null || true)
+  if [[ -z "$cmdline" ]]; then
+    return 1
+  fi
+  if [[ "$cmdline" == *"$ROOT_DIR"* || "$cmdline" == *"$BACKEND_DIR"* || "$cmdline" == *"$FRONTEND_DIR"* ]]; then
+    return 0
+  fi
+  return 1
+}
+
+stop_port() {
+  local port="$1"
+  local label="$2"
+  local pids
+  pids=$(get_listen_pids "$port")
+  if [[ -z "$pids" ]]; then
+    return 0
+  fi
+  for pid in $pids; do
+    if is_project_pid "$pid" || [[ "${FORCE_KILL_PORT:-}" == "1" ]]; then
+      echo "Stopping $label on port $port (pid $pid)"
+      kill "$pid" >/dev/null 2>&1 || true
+      for _ in {1..10}; do
+        if ! is_running "$pid"; then
+          break
+        fi
+        sleep 0.3
+      done
+      if is_running "$pid"; then
+        echo "Process $pid did not stop, forcing shutdown"
+        kill -9 "$pid" >/dev/null 2>&1 || true
+      fi
+    else
+      echo "Port $port is in use by pid $pid (not detected as project)."
+      echo "Set FORCE_KILL_PORT=1 to kill it, or change PORT/FRONTEND_PORT."
+      exit 1
+    fi
+  done
 }
 
 install_packages() {
@@ -190,9 +248,10 @@ ensure_command npm install_node
 # Stop previous runs if any.
 stop_pidfile "$RUN_DIR/backend.pid"
 stop_pidfile "$RUN_DIR/frontend.pid"
+stop_port "$BACKEND_PORT" "backend"
+stop_port "$FRONTEND_PORT" "frontend"
 
 # Backend
-BACKEND_PORT=${PORT:-8080}
 export PORT="$BACKEND_PORT"
 
 if [[ ! -f "$BACKEND_DIR/go.mod" ]]; then
@@ -207,8 +266,6 @@ echo "$BACKEND_PID" > "$RUN_DIR/backend.pid"
 echo "Backend started on :$BACKEND_PORT (pid $BACKEND_PID)"
 
 # Frontend
-FRONTEND_PORT=${FRONTEND_PORT:-5173}
-
 if [[ ! -f "$FRONTEND_DIR/package.json" ]]; then
   echo "Frontend not found at $FRONTEND_DIR" >&2
   exit 1
