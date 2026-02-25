@@ -79,6 +79,10 @@ npm run dev
 
 - `VITE_API_BASE`: 例如 `http://localhost:8080/api`
 
+若前端通过服务器 IP 访问（如 `http://<服务器IP>:5173`），建议设置：
+
+- `VITE_API_BASE`: `http://<服务器IP>:8080/api`
+
 ### 示例数据
 
 - 在前端点击“导入示例数据”即可生成模拟行情并写入数据库。

@@ -307,7 +307,7 @@ const runAkshareSync = async () => {
     if (syncForm.minEnd) payload.min_end = syncForm.minEnd
     if (syncForm.period) payload.period = syncForm.period
 
-    const { data } = await api.post('/sync/akshare', payload)
+    const { data } = await api.post('/sync/akshare', payload, { timeout: 600000 })
     syncResult.value = data.summary
     await refreshAll()
   } catch (err) {
